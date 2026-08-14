@@ -90,6 +90,71 @@
   --transition-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
+/* ─── LIGHT THEME ────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-void: #f0f2f8;
+  --bg-deep: #e8ecf5;
+  --bg-base: #dde3f0;
+  --bg-elevated: #d4dbeb;
+  --bg-surface: #c9d2e6;
+  --bg-overlay: #bec7dc;
+
+  --glass-1: rgba(0, 0, 0, 0.02);
+  --glass-2: rgba(0, 0, 0, 0.04);
+  --glass-3: rgba(0, 0, 0, 0.07);
+  --glass-4: rgba(0, 0, 0, 0.10);
+  --glass-5: rgba(0, 0, 0, 0.14);
+
+  --border-dim: rgba(0, 0, 0, 0.06);
+  --border-soft: rgba(0, 0, 0, 0.10);
+  --border-medium: rgba(0, 0, 0, 0.14);
+  --border-bright: rgba(0, 0, 0, 0.20);
+  --border-accent: rgba(255, 59, 59, 0.35);
+
+  --text-primary: rgba(15, 20, 40, 0.95);
+  --text-secondary: rgba(15, 20, 40, 0.65);
+  --text-tertiary: rgba(15, 20, 40, 0.42);
+  --text-muted: rgba(15, 20, 40, 0.28);
+
+  --shadow-glass: 0 4px 16px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255,255,255,0.7);
+  --shadow-card: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0,0,0,0.06);
+  --shadow-elevated: 0 16px 64px rgba(0, 0, 0, 0.16), 0 4px 16px rgba(0,0,0,0.08);
+}
+
+[data-theme="light"] body {
+  background: var(--bg-void);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .sidebar,
+[data-theme="light"] .settings-panel,
+[data-theme="light"] .chat-header,
+[data-theme="light"] .settings-overlay {
+  backdrop-filter: blur(24px) saturate(180%);
+}
+
+/* ─── DEEP DARK THEME ────────────────────────────────────────────────────── */
+[data-theme="deep-dark"] {
+  --bg-void: #000000;
+  --bg-deep: #040404;
+  --bg-base: #080808;
+  --bg-elevated: #0c0c0c;
+  --bg-surface: #101010;
+  --bg-overlay: #141414;
+
+  --glass-1: rgba(255, 255, 255, 0.015);
+  --glass-2: rgba(255, 255, 255, 0.03);
+  --glass-3: rgba(255, 255, 255, 0.05);
+  --glass-4: rgba(255, 255, 255, 0.07);
+  --glass-5: rgba(255, 255, 255, 0.10);
+
+  --border-dim: rgba(255, 255, 255, 0.04);
+  --border-soft: rgba(255, 255, 255, 0.07);
+  --border-medium: rgba(255, 255, 255, 0.10);
+  --border-bright: rgba(255, 255, 255, 0.15);
+  --nomad-glow: 0 0 80px rgba(168, 85, 247, 0.25), 0 0 160px rgba(255, 59, 59, 0.12);
+}
+
 /* ─── RESET & BASE ──────────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;

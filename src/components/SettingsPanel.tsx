@@ -1,11 +1,8 @@
-// Nomad AI — Settings Panel Component
-// Full settings with General, AI, Security, License, About sections
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Settings, Cpu, Shield, Key, Info, Zap, Database,
-  Check, AlertTriangle, Loader2, Eye, EyeOff, ExternalLink
+  Check, AlertTriangle, Loader2, Eye, EyeOff, ExternalLink, Sun, Moon, Palette
 } from 'lucide-react';
 import {
   detectHardware, getAvailableModels, setModel, setPassword,
@@ -13,10 +10,12 @@ import {
   getAppVersion, getSettings, setSetting,
   type HardwareInfo, type ModelInfo, type LicenseStatus,
 } from '../api';
+import { useTheme, type Theme } from '../App';
 
 interface SettingsPanelProps {
   onClose: () => void;
   onChange: () => void;
+  onModelChange: (modelId: string) => void;
   currentModel: string;
   hasPassword: boolean;
   addToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
@@ -25,7 +24,7 @@ interface SettingsPanelProps {
 type Section = 'general' | 'ai' | 'security' | 'license' | 'about';
 
 export function SettingsPanel({
-  onClose, onChange, currentModel, hasPassword, addToast
+  onClose, onChange, onModelChange, currentModel, hasPassword, addToast
 }: SettingsPanelProps) {
   const [activeSection, setActiveSection] = useState<Section>('general');
 
@@ -91,6 +90,7 @@ export function SettingsPanel({
                     currentModel={currentModel}
                     addToast={addToast}
                     onChange={onChange}
+                    onModelChange={onModelChange}
                   />
                 )}
                 {activeSection === 'security' && (
@@ -118,39 +118,53 @@ export function SettingsPanel({
 // ─── GENERAL SECTION ─────────────────────────────────────────────────────────
 
 function GeneralSection({ addToast, onChange }: { addToast: any; onChange: any }) {
-  const [theme, setTheme] = useState('dark');
+  const { theme, setTheme } = useTheme();
+
+  const themes: { id: Theme; label: string; icon: React.ReactNode; desc: string }[] = [
+    { id: 'dark', label: 'Dark', icon: <Moon size={14} />, desc: 'Deep space dark mode' },
+    { id: 'light', label: 'Light', icon: <Sun size={14} />, desc: 'Clean light mode' },
+    { id: 'deep-dark', label: 'Deep Dark', icon: <Palette size={14} />, desc: 'Maximum contrast' },
+  ];
 
   return (
     <div>
-      <div className="settings-section-title">General</div>
+      <div className="settings-section-title">Appearance</div>
       <div className="settings-group">
-        <div className="settings-row">
-          <div>
-            <div className="settings-row-label">Theme</div>
-            <div className="settings-row-desc">App appearance</div>
-          </div>
-          <div className="settings-row-right">
-            <select
-              style={{
-                background: 'var(--glass-3)',
-                border: '1px solid var(--border-soft)',
-                color: 'var(--text-primary)',
-                padding: '6px 10px',
-                borderRadius: 'var(--radius-sm)',
-                fontFamily: 'var(--font-sans)',
-                fontSize: 12,
-                cursor: 'pointer',
-                outline: 'none',
-              }}
-              value={theme}
-              onChange={e => setTheme(e.target.value)}
-            >
-              <option value="dark">Dark (Default)</option>
-              <option value="darker">Deep Dark</option>
-            </select>
+        <div style={{ padding: '8px 0 4px' }}>
+          <div className="settings-row-label" style={{ marginBottom: 10 }}>Theme</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {themes.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTheme(t.id)}
+                style={{
+                  flex: 1,
+                  padding: '10px 8px',
+                  borderRadius: 'var(--radius-md)',
+                  border: theme === t.id ? '2px solid var(--ant-red)' : '1px solid var(--border-soft)',
+                  background: theme === t.id ? 'var(--ant-red-ultra)' : 'var(--glass-2)',
+                  color: theme === t.id ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 5,
+                  fontSize: 11,
+                  fontFamily: 'var(--font-sans)',
+                  fontWeight: theme === t.id ? 600 : 400,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {t.icon}
+                {t.label}
+              </button>
+            ))}
           </div>
         </div>
+      </div>
 
+      <div className="settings-section-title" style={{ marginTop: 16 }}>Privacy</div>
+      <div className="settings-group">
         <div className="settings-row">
           <div>
             <div className="settings-row-label">Privacy Mode</div>
@@ -195,8 +209,8 @@ function GeneralSection({ addToast, onChange }: { addToast: any; onChange: any }
 
 // ─── AI SECTION ───────────────────────────────────────────────────────────────
 
-function AISection({ currentModel, addToast, onChange }: {
-  currentModel: string; addToast: any; onChange: any;
+function AISection({ currentModel, addToast, onChange, onModelChange }: {
+  currentModel: string; addToast: any; onChange: any; onModelChange: (id: string) => void;
 }) {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [hardware, setHardware] = useState<HardwareInfo | null>(null);
@@ -250,8 +264,9 @@ function AISection({ currentModel, addToast, onChange }: {
     try {
       await setModel(modelId);
       setSelectedModel(modelId);
+      onModelChange(modelId);
       onChange();
-      addToast(`Switched to ${modelId === 'high-end' ? 'Nomad Pro' : 'Nomad Compact'}`, 'success');
+      addToast(`Switched to ${modelId === 'high-end' ? '⚡ Nomad Pro' : '🤖 Nomad Compact'}`, 'success');
     } catch (e) {
       addToast('Failed to switch model', 'error');
     }

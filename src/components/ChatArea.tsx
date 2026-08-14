@@ -20,6 +20,7 @@ interface ChatAreaProps {
   installDir: string;
   addToast: (msg: string, type?: 'success' | 'error' | 'info') => void;
   onChatUpdate: () => void;
+  initialMessage?: string;
 }
 
 interface StreamingState {
@@ -33,6 +34,7 @@ export function ChatArea({
   currentModel,
   addToast,
   onChatUpdate,
+  initialMessage,
 }: ChatAreaProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -63,6 +65,51 @@ export function ChatArea({
   useEffect(() => {
     loadMessages();
   }, [loadMessages]);
+
+  // Auto-send initial message from suggestion cards
+  useEffect(() => {
+    if (initialMessage && initialMessage.trim()) {
+      setInputText(initialMessage);
+      // Small delay to let the chat area render before sending
+      const timer = setTimeout(() => {
+        setInputText(prev => {
+          if (prev === initialMessage) {
+            // trigger send
+            const text = prev.trim();
+            if (text) {
+              setInputText('');
+              setIsStreaming(true);
+              streamingContentRef.current = '';
+              const tempUserMsg = {
+                id: 'temp-user-' + Date.now(),
+                chat_id: chatId,
+                role: 'user' as const,
+                content: text,
+                created_at: new Date().toISOString(),
+              };
+              const tempAiMsg = {
+                id: 'temp-ai-' + Date.now(),
+                chat_id: chatId,
+                role: 'assistant' as const,
+                content: '...',
+                created_at: new Date().toISOString(),
+              };
+              setMessages([tempUserMsg, tempAiMsg]);
+              setTimeout(scrollToBottom, 50);
+              sendMessage(chatId, text).catch(e => {
+                setIsStreaming(false);
+                addToast('Failed to send: ' + String(e), 'error');
+                setMessages([]);
+              });
+            }
+          }
+          return prev;
+        });
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMessage, chatId]);
 
   // Set up streaming listener
   useEffect(() => {

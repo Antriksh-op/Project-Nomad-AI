@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, createContext, useContext } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Minus, Maximize2, X, Lock } from 'lucide-react';
 import {
@@ -8,6 +8,8 @@ import {
   closeWindow,
   unlockApp,
   createChat,
+  setSetting,
+  getSettings,
   type AppStateDto,
 } from './api';
 import { Sidebar } from './components/Sidebar';
@@ -15,6 +17,22 @@ import { ChatArea } from './components/ChatArea';
 import { SettingsPanel } from './components/SettingsPanel';
 import { Toast, type ToastMessage } from './components/Toast';
 import './index.css';
+
+// ─── THEME CONTEXT ────────────────────────────────────────────────────────────
+
+export type Theme = 'dark' | 'light' | 'deep-dark';
+
+interface ThemeContextType {
+  theme: Theme;
+  setTheme: (t: Theme) => void;
+}
+
+export const ThemeContext = createContext<ThemeContextType>({
+  theme: 'dark',
+  setTheme: () => {},
+});
+
+export const useTheme = () => useContext(ThemeContext);
 
 // ─── LOCK SCREEN ─────────────────────────────────────────────────────────────
 
@@ -155,15 +173,15 @@ function WelcomeScreen({
   currentModel: string;
 }) {
   const suggestions = [
-    { title: 'Write something', body: 'Help me write a professional email to my team...' },
-    { title: 'Analyze a document', body: 'Attach a file and I\'ll summarize it for you.' },
-    { title: 'Code assistance', body: 'Explain how to implement a binary search tree...' },
-    { title: 'Just chat', body: 'Tell me something interesting about the universe...' },
+    { title: '✍️ Write something', body: 'Help me write a professional email to my team...' },
+    { title: '📄 Analyze a document', body: 'Attach a file and I\'ll summarize it for you.' },
+    { title: '💻 Code assistance', body: 'Explain how to implement a binary search tree...' },
+    { title: '💬 Just chat', body: 'Tell me something interesting about the universe...' },
   ];
 
-  const handleSuggestion = async () => {
+  const handleSuggestion = async (body: string) => {
     const chat = await createChat('New Chat');
-    onNewChat(chat.id);
+    onNewChat(chat.id, body);
   };
 
   return (
@@ -192,7 +210,7 @@ function WelcomeScreen({
             color: currentModel === 'high-end' ? 'var(--accent-purple)' : 'var(--accent-cyan)',
           }}
         >
-          {currentModel === 'high-end' ? 'Nomad Pro' : 'Nomad Compact'}
+          {currentModel === 'high-end' ? '⚡ Nomad Pro' : '🤖 Nomad Compact'}
         </span>
       </p>
 
@@ -201,10 +219,12 @@ function WelcomeScreen({
           <motion.button
             key={i}
             className="suggestion-card"
-            onClick={handleSuggestion}
+            onClick={() => handleSuggestion(s.body)}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 + i * 0.07 }}
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
           >
             <strong>{s.title}</strong>
             {s.body}
@@ -222,9 +242,19 @@ export default function App() {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [initialMessage, setInitialMessage] = useState<string | undefined>(undefined);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshChats, setRefreshChats] = useState(0);
+  const [theme, setThemeState] = useState<Theme>('dark');
+  const [currentModel, setCurrentModel] = useState('low-end');
+
+  // Apply theme to document
+  const setTheme = useCallback((t: Theme) => {
+    setThemeState(t);
+    document.documentElement.setAttribute('data-theme', t);
+    setSetting('theme', t).catch(() => {});
+  }, []);
 
   const addToast = useCallback(
     (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -243,18 +273,29 @@ export default function App() {
     getAppState()
       .then(state => {
         setAppState(state);
+        setCurrentModel(state.current_model);
         setIsUnlocked(!state.has_password || state.is_unlocked);
+
+        // Load saved theme
+        getSettings().then(settings => {
+          const saved = settings.find(s => s.key === 'theme');
+          if (saved?.value) {
+            setThemeState(saved.value as Theme);
+            document.documentElement.setAttribute('data-theme', saved.value);
+          }
+        }).catch(() => {});
+
         setLoading(false);
       })
       .catch(() => {
-        // Development fallback when Tauri backend is not available
         setAppState({
           is_unlocked: true,
           has_password: false,
           current_model: 'low-end',
-          install_dir: '.',
-          is_activated: true,
+          install_dir: 'Demo Mode',
+          is_activated: false,
         });
+        setCurrentModel('low-end');
         setIsUnlocked(true);
         setLoading(false);
       });
@@ -265,16 +306,25 @@ export default function App() {
     setAppState(prev => (prev ? { ...prev, is_unlocked: true } : prev));
   }, []);
 
-  const handleNewChat = useCallback((chatId: string) => {
+  const handleNewChat = useCallback((chatId: string, prefill?: string) => {
     setActiveChatId(chatId);
+    setInitialMessage(prefill);
     setRefreshChats(v => v + 1);
   }, []);
 
   const handleSettingsChange = useCallback(() => {
     getAppState()
-      .then(setAppState)
+      .then(state => {
+        setAppState(state);
+        setCurrentModel(state.current_model);
+      })
       .catch(() => {});
     setRefreshChats(v => v + 1);
+  }, []);
+
+  const handleModelChange = useCallback((modelId: string) => {
+    setCurrentModel(modelId);
+    setAppState(prev => prev ? { ...prev, current_model: modelId } : prev);
   }, []);
 
   if (loading) {
@@ -289,59 +339,63 @@ export default function App() {
   }
 
   return (
-    <div className="app-root">
-      <TitleBar />
+    <ThemeContext.Provider value={{ theme, setTheme }}>
+      <div className="app-root" data-theme={theme}>
+        <TitleBar />
 
-      <AnimatePresence>
-        {!isUnlocked && <LockScreen onUnlock={handleUnlock} />}
-      </AnimatePresence>
+        <AnimatePresence>
+          {!isUnlocked && <LockScreen onUnlock={handleUnlock} />}
+        </AnimatePresence>
 
-      <div className="app-content">
-        <Sidebar
-          activeChatId={activeChatId}
-          onSelectChat={setActiveChatId}
-          onNewChat={handleNewChat}
-          onOpenSettings={() => setShowSettings(true)}
-          currentModel={appState?.current_model || 'low-end'}
-          refreshTrigger={refreshChats}
-          addToast={addToast}
-        />
-
-        <div className="main-area">
-          <AnimatePresence mode="wait">
-            {activeChatId ? (
-              <ChatArea
-                key={activeChatId}
-                chatId={activeChatId}
-                currentModel={appState?.current_model || 'low-end'}
-                installDir={appState?.install_dir || '.'}
-                addToast={addToast}
-                onChatUpdate={() => setRefreshChats(v => v + 1)}
-              />
-            ) : (
-              <WelcomeScreen
-                key="welcome"
-                onNewChat={handleNewChat}
-                currentModel={appState?.current_model || 'low-end'}
-              />
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
-
-      <AnimatePresence>
-        {showSettings && (
-          <SettingsPanel
-            onClose={() => setShowSettings(false)}
-            onChange={handleSettingsChange}
-            currentModel={appState?.current_model || 'low-end'}
-            hasPassword={appState?.has_password || false}
+        <div className="app-content">
+          <Sidebar
+            activeChatId={activeChatId}
+            onSelectChat={(id) => { setActiveChatId(id); setInitialMessage(undefined); }}
+            onNewChat={handleNewChat}
+            onOpenSettings={() => setShowSettings(true)}
+            currentModel={currentModel}
+            refreshTrigger={refreshChats}
             addToast={addToast}
           />
-        )}
-      </AnimatePresence>
 
-      <Toast toasts={toasts} onRemove={removeToast} />
-    </div>
+          <div className="main-area">
+            <AnimatePresence mode="wait">
+              {activeChatId ? (
+                <ChatArea
+                  key={activeChatId}
+                  chatId={activeChatId}
+                  currentModel={currentModel}
+                  installDir={appState?.install_dir || '.'}
+                  addToast={addToast}
+                  onChatUpdate={() => setRefreshChats(v => v + 1)}
+                  initialMessage={initialMessage}
+                />
+              ) : (
+                <WelcomeScreen
+                  key="welcome"
+                  onNewChat={handleNewChat}
+                  currentModel={currentModel}
+                />
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        <AnimatePresence>
+          {showSettings && (
+            <SettingsPanel
+              onClose={() => setShowSettings(false)}
+              onChange={handleSettingsChange}
+              onModelChange={handleModelChange}
+              currentModel={currentModel}
+              hasPassword={appState?.has_password || false}
+              addToast={addToast}
+            />
+          )}
+        </AnimatePresence>
+
+        <Toast toasts={toasts} onRemove={removeToast} />
+      </div>
+    </ThemeContext.Provider>
   );
 }
